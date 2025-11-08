@@ -1,0 +1,20 @@
+{
+  "name": "4gchat",
+  "version": "0.1.0",
+  "description": "Simple AI chatbot CLI",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "bin": {
+    "4gchat": "./index.js"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3"
+  }
+}
