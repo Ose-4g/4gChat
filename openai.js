@@ -1,19 +1,20 @@
-const https = require('https');
-require('dotenv').config();
+require('dotenv').config({quiet: true});
+const {OpenAI} = require('openai');
+
 
 /**
- * askai(prompt)
+ * Send a prompt to the OpenAI Responses API and return the raw response text.
  *
- * Sends the user's prompt to the OpenAI Chat Completions API and returns
- * the assistant's reply as a string.
+ * Validates input and the presence of OPENAI_API_KEY, then calls the Responses
+ * API with a system instruction that asks the model to produce shell commands
+ * in a specific JSON format.
  *
- * Requires environment variable OPENAI_API_KEY to be set.
- *
- * @param {string} prompt - User prompt to send as the user message
- * @param {{ model?: string, temperature?: number, max_tokens?: number, systemMessage?: string }} [opts]
- * @returns {Promise<string>} assistant reply content
+ * @param {string} prompt - Non-empty user prompt describing the desired shell command.
+ * @returns {Promise<string>} The raw text returned by the OpenAI Responses API (response.output_text).
+ * @throws {TypeError} If prompt is not a non-empty string.
+ * @throws {Error} If OPENAI_API_KEY is not set or an API error/unexpected error occurs.
  */
-async function askai(prompt, opts = {}) {
+async function askai(prompt) {
   if (typeof prompt !== 'string' || prompt.trim() === '') {
     throw new TypeError('prompt must be a non-empty string');
   }
@@ -23,57 +24,42 @@ async function askai(prompt, opts = {}) {
     throw new Error('OPENAI_API_KEY environment variable is not set');
   }
 
-  const model = opts.model || 'gpt-5';
-  const systemMessage = opts.systemMessage || `
-  you are an ai that generates shell commands for a user based on the user's request. 
-  Only send back the shell command as a single line without any additional explanation.
-  If it is not possible to generate a command or you need more context, respond with a sentence starting with ERROR and then add your explanation.
-  `;
-  const temperature = typeof opts.temperature === 'number' ? opts.temperature : 0;
-  const max_tokens = typeof opts.max_tokens === 'number' ? opts.max_tokens : 300;
+  const model = 'gpt-5';
+  const systemMessage = `
+you are an ai that generates shell commands for a user based on the user's request.
+The user is using a linux machine.
+You will always send back a json in this format
+{
+  "success": boolean
+  "response": string
+  "remark": string
+}
 
-  const body = JSON.stringify({
-    model,
-    instructions: systemMessage,
-    input: prompt,
-  });
+if you are able to get a shell command successfully for the user, "success" will be true
+"response" is the shell command we want the user to run
+"remark" will be empty if "success" is true. If "success" is false, then "remark" will be the explanation why it couldnt be done.
+`;
 
-  const res = await new Promise((resolve, reject) => {
-    const req = https.request('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-        'Authorization': `Bearer ${apiKey}`
+  try {
+    const openai = new OpenAI({ apiKey });
+    const response = await openai.responses.create({
+      model,
+      instructions: systemMessage,
+      input: prompt,
+      reasoning: {
+        effort: 'minimal'
       }
-    }, (resp) => {
-      let data = '';
-      resp.on('data', chunk => data += chunk);
-      resp.on('end', () => {
-        if (resp.statusCode && resp.statusCode >= 200 && resp.statusCode < 300) {
-          try {
-            resolve(JSON.parse(data));
-          } catch (err) {
-            reject(new Error('Failed to parse OpenAI response: ' + err.message));
-          }
-        } else {
-          reject(new Error(`OpenAI API error ${resp.statusCode}: ${data}`));
-        }
-      });
     });
 
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
+    return response.output_text;
+  } catch (error) {
+    // Prefer a simple message regardless of OpenAI SDK error types
+    if (error && error.message) {
+      throw new Error(`OpenAI API Error: ${error.message}`);
+    }
 
-  console.log(JSON.parse(JSON.stringify(res.output[1].content)))
-
-  if (!res || !res.output || !res.output[0] || !res.output[0].content) {
-    throw new Error('No assistant message in OpenAI response');
+    throw new Error('Unexpected Error');
   }
-
-  return res.output[0].content[0].text;
 }
 
 module.exports = { askai };
