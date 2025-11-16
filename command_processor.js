@@ -6,9 +6,8 @@ const execAsync = util.promisify(exec);
 /**
  * Execute a shell command and return structured output.
  *
- * Uses child_process.exec (promisified). Returns an object with `stdout`
- * or an `error` string. On command failures the returned object will
- * include stderr (if available) or the error message.
+ * Executes the provided shell command via child_process.exec (promisified). The
+ * returned object contains either stdout or an error (stderr or exec error).
  *
  * @param {string} command - Non-empty shell command to execute.
  * @returns {Promise<{ error: string|null, stdout: string|null }>}

@@ -5,20 +5,20 @@ const { OpenAI } = require('openai');
 
 
 /**
- * Retrieve the OpenAI API key from a JSON config file located at
- * ~/.4gchatConfig.json or fall back to the environment.
+ * Retrieve the configuration from a JSON config file located at
+ * ~/.4gchatConfig.json. The file is expected to be a JSON object that may
+ * contain an OPENAI_API_KEY and optional settings like OS.
  *
- * Expected file format:
+ * Example:
  * {
- *   "OPENAI_API_KEY": "your-key-here"
+ *   "OPENAI_API_KEY": "your-key-here",
  *   "OS": "linux"
  * }
  *
  * This function will silently ignore parse errors and return null if the
- * file or value is not available. Prefer this over throwing during start-up
- * so callers can decide how to handle a missing key.
+ * file or value is not available so callers can decide how to fallback.
  *
- * @returns {string|null} The API key or null when not found.
+ * @returns {Object|null} Parsed configuration object, or null when not found.
  */
 const getConfig = () => {
   try {
@@ -31,15 +31,11 @@ const getConfig = () => {
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
-    // if (parsed && typeof parsed.OPENAI_API_KEY === 'string' && parsed.OPENAI_API_KEY.trim() !== '') {
-    //   return parsed.OPENAI_API_KEY.trim();
-    // }
-
     return parsed;
   } catch (err) {
     // Ignore errors (file may be missing or malformed); return null so
     // callers can fallback to environment variables if desired.
-    return {};
+    return null;
   }
 };
 
@@ -59,14 +55,19 @@ async function askai(prompt) {
   if (typeof prompt !== 'string' || prompt.trim() === '') {
     throw new TypeError('prompt must be a non-empty string');
   }
+  // prefer API key in config file, then fall back to environment variable
   const config = getConfig();
-  if (!config || typeof config.OPENAI_API_KEY !== 'string' || config.OPENAI_API_KEY.trim() === '') {
+  const apiKey = config && typeof config.OPENAI_API_KEY === 'string' && config.OPENAI_API_KEY.trim() !== ''
+    ? config.OPENAI_API_KEY.trim()
+    : null;
+
+  if (!apiKey) {
     throw new Error('OPENAI_API_KEY is not set in ~/.4gchatConfig.json or the environment');
   }
 
-  const apiKey = config.OPENAI_API_KEY;
-
-  const os = config && typeof config.OS == 'string' && config.OS.trim()!==''  ? config.OS.toLowerCase() : 'linux';
+  const osSetting = config && typeof config.OS === 'string' && config.OS.trim() !== ''
+    ? config.OS.toLowerCase()
+    : 'linux';
 
   const model = 'gpt-5';
   const systemMessage = `
