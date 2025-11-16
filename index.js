@@ -6,34 +6,34 @@ const program = new Command();
 
 
 // Add a command
-// program
-//   .argument('<user_prompt>')
-//   .description('Ask the AI a question')
-//   .option('-v, --verbose', 'Show the command to be processed')
-//   .action((user_prompt, options) => {
-//     // process the user prompt
-//     if (options.verbose) {
-//       message = message.toUpperCase();
-//     }
-//   });
+program
+  .argument('<user_prompt>')
+  .description('Ask the AI a question')
+  .action((user_prompt) => {
+    (async ()=>{
+        try {
+            const data = await askai(user_prompt);
+            const json = JSON.parse(data);
+            if(json.success){
+                console.log("Executing command:", json.response);
+                const commandResult = await process_command(json.response);
+                if(commandResult.error){
+                    console.error("Command execution error:", commandResult.error);
+                    return;
+                }
+                console.log(commandResult.stdout);
+            }
+            else{
+                console.error("AI could not provide a command:", json.remark);
+            }
+        } catch (error) {
+            console.log(error.message);
+        }
+    })()
+  });
 
-// // Parse the arguments
-// program.parse(process.argv);
+// Parse the arguments
+program.parse(process.argv);
 
 
 
-// process_command('top')
-//   .then(result => {
-//     // result.code is the exit code, result.error is error info (if any)
-//     console.log('Process finished with code:', result.code);
-//     if (result.error) {
-//       console.error('Error:', result.error);
-//     }
-//   })
-//   .catch(err => {
-//     console.error('Failed to run command:', err);
-//   });
-
-(async ()=>{
-    await askai("I want to list all files in the current directory");
-})()
